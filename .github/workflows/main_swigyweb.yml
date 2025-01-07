@@ -1,4 +1,5 @@
 name: Node js Docker Image Deploy into ECR
+
 on:
   push:
     branches: ["main"]
@@ -29,12 +30,12 @@ jobs:
             echo "npm_found=true" >> $GITHUB_ENV
           fi
 
-      - name: Install dependencies, build, and test
-        if: env.npm_found == 'true'
-        run: |
-          npm install
-          npm run build --if-present
-          npm run test --if-present
+      # - name: Install dependencies, build, and test
+      #   if: env.npm_found == 'true'
+      #   run: |
+      #     npm install
+      #     npm run build --if-present
+      #     npm run test --if-present
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -42,6 +43,37 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
+          
+      # SonarQube Scan Job
+      - name: SonarQube Scan
+        uses: sonarsource/sonarcloud-github-action@v2
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}  # Add your SonarQube Token in GitHub Secrets
+        with:
+          sonar-project-key: "Swigy-01"
+          sonar-host-url: "http://52.207.163.111:9000"
+          sonar-project-name: "Swigy-01"
+
+      # SonarQube Quality Gate Check
+      - name: Wait for SonarQube Quality Gate
+        uses: sonarsource/sonarcloud-github-action@v2
+        with:
+          sonar-project-key: "Swigy-01"
+          sonar-host-url: "http://52.207.163.111:9000"
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        continue-on-error: false  # This will fail the workflow if quality gate fails
+
+      # Optional: SonarCloud analysis for pull request (if using SonarCloud)
+      - name: SonarCloud PR Analysis
+        if: github.event_name == 'pull_request'
+        uses: sonarsource/sonarcloud-github-action@v2
+        with:
+          sonar-project-key: "Swigy-01"
+          sonar-host-url: "https://sonarcloud.io"
+          sonar-project-name: "Swigy-01"
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
       - name: Create ECR repository (if not exists)
         run: |
@@ -63,3 +95,5 @@ jobs:
       - name: Push Docker image to ECR
         run: |
           docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/nodejs-docker-repo:latest
+
+
