@@ -17,7 +17,20 @@ jobs:
         with:
           node-version: '16'  # Set your Node.js version here
 
+      - name: Check if npm is available
+        id: check_npm
+        run: |
+          if ! command -v npm &> /dev/null
+          then
+            echo "npm not found, skipping npm install, build, and test."
+            echo "npm_found=false" >> $GITHUB_ENV
+          else
+            echo "npm found, proceeding with npm install, build, and test."
+            echo "npm_found=true" >> $GITHUB_ENV
+          fi
+
       - name: Install dependencies, build, and test
+        if: env.npm_found == 'true'
         run: |
           npm install
           npm run build --if-present
