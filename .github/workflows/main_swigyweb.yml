@@ -30,6 +30,7 @@ jobs:
             echo "npm_found=true" >> $GITHUB_ENV
           fi
 
+      # Uncomment the following block if you want to run npm install, build, and test
       # - name: Install dependencies, build, and test
       #   if: env.npm_found == 'true'
       #   run: |
@@ -50,21 +51,21 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}  # Add your SonarQube Token in GitHub Secrets
         with:
-          sonar-project-key: "Swigy-01"
-          sonar-host-url: "http://52.207.163.111:9000"
+          sonar.projectKey: "Swigy-01"
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
           sonar-project-name: "Swigy-01"
 
       # SonarQube Quality Gate Check
       - name: Wait for SonarQube Quality Gate
         uses: sonarsource/sonarcloud-github-action@v2
         with:
-          sonar-project-key: "Swigy-01"
-          sonar-host-url: "http://52.207.163.111:9000"
+          sonar.projectKey: "Swigy-01"
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        continue-on-error: false  # This will fail the workflow if quality gate fails
+        continue-on-error: false  # This will fail the workflow if the quality gate fails
 
-      # # Optional: SonarCloud analysis for pull request (if using SonarCloud)
+      # Optional: SonarCloud analysis for pull request (if using SonarCloud)
       # - name: SonarCloud PR Analysis
       #   if: github.event_name == 'pull_request'
       #   uses: sonarsource/sonarcloud-github-action@v2
@@ -95,5 +96,3 @@ jobs:
       - name: Push Docker image to ECR
         run: |
           docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/nodejs-docker-repo:latest
-
-
