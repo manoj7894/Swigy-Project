@@ -62,34 +62,39 @@ jobs:
           # Download the Dependency-Check ZIP file (use the latest available version)
           wget https://github.com/jeremylong/DependencyCheck/releases/download/v11.1.1/dependency-check-11.1.1-release.zip
 
-          # Check if the file was downloaded successfully
-          if [ ! -f dependency-check-8.3.3-release.zip ]; then
+          # Check if the file was downloaded successfully (use the correct file name)
+          if [ ! -f dependency-check-11.1.1-release.zip ]; then
             echo "Error: Dependency-Check zip file download failed!"
             exit 1
           fi
 
           # Verify the downloaded file size (ensure it's not empty)
-          file_size=$(stat -c %s dependency-check-8.3.3-release.zip)
+          file_size=$(stat -c %s dependency-check-11.1.1-release.zip)
           if [ "$file_size" -le 0 ]; then
             echo "Error: The downloaded file is empty!"
             exit 1
           fi
 
           # Ensure the file is a valid zip file
-          if ! unzip -t dependency-check-8.3.3-release.zip; then
+          if ! unzip -t dependency-check-11.1.1-release.zip; then
             echo "Error: Invalid zip file."
             exit 1
           fi
 
           # Unzip the file
-          unzip dependency-check-8.3.3-release.zip
+          unzip dependency-check-11.1.1-release.zip
 
-          # Check the version of Dependency-Check
-          ./dependency-check/bin/dependency-check.sh --version
+          # Navigate to the folder where the binary is located and check the version of Dependency-Check
+          cd dependency-check-11.1.1
+          ./bin/dependency-check.sh --version
 
       - name: Run OWASP Dependency-Check
         run: |
-          ./dependency-check/bin/dependency-check.sh --project "NodeJS App" --scan . --out ./dependency-check-report
+          # Ensure the script is in the correct directory after unzip
+          cd dependency-check-11.1.1
+
+          # Run Dependency-Check to scan the project and generate the report
+          ./bin/dependency-check.sh --project "NodeJS App" --scan . --out ./dependency-check-report
 
       # Code Scan For SonarQube    
       - name: SonarQube Scan
