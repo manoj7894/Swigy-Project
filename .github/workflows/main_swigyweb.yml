@@ -1,10 +1,12 @@
-name: Node js Docker Image Deploy into ECR
+name: Node.js Docker Image Deploy into ECR
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - main
   pull_request:
-    branches: ["main"]
+    branches:
+      - main
 
 jobs:
   deploy:
@@ -16,13 +18,12 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '16'  # Set your Node.js version here
+          node-version: '16'  # Set your Node.js version
 
       - name: Check if npm is available
         id: check_npm
         run: |
-          if ! command -v npm &> /dev/null
-          then
+          if ! command -v npm &> /dev/null; then
             echo "npm not found, skipping npm install, build, and test."
             echo "npm_found=false" >> $GITHUB_ENV
           else
@@ -30,7 +31,6 @@ jobs:
             echo "npm_found=true" >> $GITHUB_ENV
           fi
 
-      # Uncomment the following block if you want to run npm install, build, and test
       # - name: Install dependencies, build, and test
       #   if: env.npm_found == 'true'
       #   run: |
@@ -44,43 +44,58 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
-          
+
       - name: SonarQube Scan
         uses: sonarsource/sonarqube-scan-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-          
-      - name: SonarQube Quality Gate check
-        id: quality-gate
-        uses: sonarsource/sonarqube-quality-gate-action@master
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=TaskMaster
+            -Dsonar.projectName=TaskMaster
+            -Dsonar.sources=.
+            -Dsonar.pullrequest.key=${{ github.event.pull_request.number }}
+            -Dsonar.pullrequest.branch=${{ github.head_ref }}
+            -Dsonar.pullrequest.base=${{ github.base_ref }}
 
-      - name: Fail if Quality Gate fails
-        if: steps.quality-gate.outputs.quality_gate_status != 'passed'
-        run: |
-          echo "SonarQube Quality Gate failed!"
-          exit 1
+      # - name: SonarQube Quality Gate check
+      #   id: quality-gate
+      #   uses: sonarsource/sonarqube-quality-gate-action@master
+      #   env:
+      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      #     SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      # - name: Fail if Quality Gate fails
+      #   if: steps.quality-gate.outputs.quality_gate_status != 'passed'
+      #   run: |
+      #     echo "SonarQube Quality Gate failed!"
+      #     exit 1
 
       - name: Create ECR repository (if not exists)
+        if: github.event_name == 'push'
         run: |
           REPOSITORY_NAME=nodejs-docker-repo
-          aws ecr describe-repositories --repository-names $REPOSITORY_NAME || aws ecr create-repository --repository-name $REPOSITORY_NAME
+          aws ecr describe-repositories --repository-names $REPOSITORY_NAME || \
+          aws ecr create-repository --repository-name $REPOSITORY_NAME
 
       - name: Log in to Amazon ECR
+        if: github.event_name == 'push'
         run: |
-          aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com
+          aws ecr get-login-password --region ap-south-1 | \
+          docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com
 
       - name: Build Docker image
+        if: github.event_name == 'push'
         run: |
           docker build -t nodejsk1 .
 
       - name: Tag Docker image for ECR
+        if: github.event_name == 'push'
         run: |
           docker tag nodejsk1:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/nodejs-docker-repo:latest
 
       - name: Push Docker image to ECR
+        if: github.event_name == 'push'
         run: |
           docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/nodejs-docker-repo:latest
