@@ -45,26 +45,29 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
 
-      # SonarQube Scan Job
+       # SonarQube Scan Job
       - name: SonarQube Scan
-        run: |
-          sonar-scanner \
-            -Dsonar.projectKey=Swigy-01 \
-            -Dsonar.sources=. \
-            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
-            -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
-            -Dsonar.projectName="Swigy-01" \
-            -Dsonar.verbose=true \
-            -Dsonar.log.level=DEBUG
+        uses: sonarsource/sonarqube-scan-actions@v1
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}  # Add your SonarQube Token in GitHub Secrets
+        with:
+          sonar.projectKey: "Swigy-01"
+          sonar.host-url: ${{ secrets.SONAR_HOST_URL }}  # Use your SonarQube URL
+          sonar-project-name: "Swigy-01"
+          extra-properties: |
+            sonar.verbose=true
+            sonar.log.level=DEBUG
 
       # SonarQube Quality Gate Check
       - name: Wait for SonarQube Quality Gate
-        run: |
-          sonar-quality-gate \
-            --url "${{ secrets.SONAR_HOST_URL }}" \
-            --token "${{ secrets.SONAR_TOKEN }}" \
-            --project "Swigy-01"
-        continue-on-error: false  # This will fail the workflow if the quality gate fails
+        uses: sonarsource/sonarqube-scan-actions@v1
+        with:
+          sonar.projectKey: "Swigy-01"
+          sonar.host-url: ${{ secrets.SONAR_HOST_URL }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        continue-on-error: false  # This will fail the workflow if quality gate fails
+
 
       # Optional: SonarQube analysis for pull request
       # - name: SonarQube PR Analysis
