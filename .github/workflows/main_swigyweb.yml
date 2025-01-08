@@ -45,41 +45,24 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
 
-       # SonarQube Scan Job
-      - name: SonarQube Scan
-        uses: sonarsource/sonarqube-scan-actions@v1
+      - name: SonarCloud Scan
+        uses: sonarsource/sonarcloud-github-action@master
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}  # Add your SonarQube Token in GitHub Secrets
+          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
-          sonar.projectKey: "Swigy-01"
-          sonar.host-url: ${{ secrets.SONAR_HOST_URL }}  # Use your SonarQube URL
-          sonar-project-name: "Swigy-01"
-          extra-properties: |
-            sonar.verbose=true
-            sonar.log.level=DEBUG
+          args: >
+            -Dsonar.organization=rekhugopal
+            -Dsonar.projectKey=SonarCloudCodeAnalyisis
+            -Dsonar.sources=.
 
       # SonarQube Quality Gate Check
-      - name: Wait for SonarQube Quality Gate
-        uses: sonarsource/sonarqube-scan-actions@v1
+      - name: Wait for SonarCloud Quality Gate
+        uses: sonarsource/sonarcloud-quality-gate-action@master
         with:
-          sonar.projectKey: "Swigy-01"
-          sonar.host-url: ${{ secrets.SONAR_HOST_URL }}
+          projectKey: SonarCloudCodeAnalyisis
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        continue-on-error: false  # This will fail the workflow if quality gate fails
-
-
-      # Optional: SonarQube analysis for pull request
-      # - name: SonarQube PR Analysis
-      #   if: github.event_name == 'pull_request'
-      #   run: |
-      #     sonar-scanner \
-      #       -Dsonar.projectKey=Swigy-01 \
-      #       -Dsonar.sources=. \
-      #       -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
-      #       -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
-      #       -Dsonar.projectName="Swigy-01" \
-      #       -Dsonar.pullrequest.key=${{ github.event.pull_request.number }}
 
       - name: Create ECR repository (if not exists)
         run: |
