@@ -59,30 +59,30 @@ jobs:
       # OWASP Dependency-Check
       - name: Install OWASP Dependency-Check
         run: |
-          # Download the Dependency-Check ZIP file using wget for better error handling
-          wget https://github.com/jeremylong/DependencyCheck/releases/download/v8.3.2/dependency-check-8.3.2-release.zip
+          # Download the Dependency-Check ZIP file (use the latest available version)
+          wget https://github.com/jeremylong/DependencyCheck/releases/download/v8.3.3/dependency-check-8.3.3-release.zip
 
           # Check if the file was downloaded successfully
-          if [ ! -f dependency-check-8.3.2-release.zip ]; then
+          if [ ! -f dependency-check-8.3.3-release.zip ]; then
             echo "Error: Dependency-Check zip file download failed!"
             exit 1
           fi
 
           # Verify the downloaded file size (ensure it's not empty)
-          file_size=$(stat -c %s dependency-check-8.3.2-release.zip)
+          file_size=$(stat -c %s dependency-check-8.3.3-release.zip)
           if [ "$file_size" -le 0 ]; then
             echo "Error: The downloaded file is empty!"
             exit 1
           fi
 
           # Ensure the file is a valid zip file
-          if ! unzip -t dependency-check-8.3.2-release.zip; then
+          if ! unzip -t dependency-check-8.3.3-release.zip; then
             echo "Error: Invalid zip file."
             exit 1
           fi
 
           # Unzip the file
-          unzip dependency-check-8.3.2-release.zip
+          unzip dependency-check-8.3.3-release.zip
 
           # Check the version of Dependency-Check
           ./dependency-check/bin/dependency-check.sh --version
