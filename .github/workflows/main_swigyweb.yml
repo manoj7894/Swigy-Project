@@ -51,9 +51,9 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}  # Add your SonarQube Token in GitHub Secrets
         with:
-          sonar.projectKey: "Swigy"
+          sonar.projectKey: "my-awesome-project"  # Use the actual project key here
           sonar.host-url: ${{ secrets.SONAR_HOST_URL }}  # Use your SonarQube URL
-          sonar-project-name: "Swigy"
+          sonar-project-name: "My Awesome Project"  # Name of the project for display purposes
           extra-properties: |
             sonar.verbose=true
             sonar.log.level=DEBUG
@@ -62,7 +62,7 @@ jobs:
       - name: Wait for SonarQube Quality Gate
         uses: sonarsource/sonarqube-scan-action@master
         with:
-          sonar.projectKey: "Swigy"
+          sonar.projectKey: "my-awesome-project"
           sonar.host-url: ${{ secrets.SONAR_HOST_URL }}
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -73,7 +73,7 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: sonarsource/sonarcloud-github-action@v2
         with:
-          sonar-project-key: "Swigy-01"
+          sonar.projectKey: "my-awesome-project"
           sonar-host-url: "http://your-sonarqube-server-url"
           sonar-project-name: "Swigy-01"
         env:
