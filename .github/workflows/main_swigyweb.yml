@@ -32,13 +32,13 @@ jobs:
             echo "npm_found=true" >> $GITHUB_ENV
           fi
 
-      # Uncomment the following block if you want to run npm install, build, and test
-      - name: Install dependencies, build, and test
-        if: env.npm_found == 'true'
-        run: |
-          npm install
-          npm run build --if-present
-          npm run test --if-present
+      # # Uncomment the following block if you want to run npm install, build, and test
+      # - name: Install dependencies, build, and test
+      #   if: env.npm_found == 'true'
+      #   run: |
+      #     npm install
+      #     npm run build --if-present
+      #     npm run test --if-present
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
