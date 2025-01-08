@@ -51,33 +51,33 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}  # Add your SonarQube Token in GitHub Secrets
         with:
-          sonar.projectKey: "Swigy-01"
+          sonar.projectKey: "Swigy"
           sonar.host-url: ${{ secrets.SONAR_HOST_URL }}  # Use your SonarQube URL
-          sonar-project-name: "Swigy-01"
+          sonar-project-name: "Swigy"
           extra-properties: |
             sonar.verbose=true
             sonar.log.level=DEBUG
 
       # SonarQube Quality Gate Check
       - name: Wait for SonarQube Quality Gate
-        uses: sonarsource/sonarcloud-github-action@v2
+        uses: sonarsource/sonarqube-scan-action@master
         with:
-          sonar.projectKey: "Swigy-01"
+          sonar.projectKey: "Swigy"
           sonar.host-url: ${{ secrets.SONAR_HOST_URL }}
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         continue-on-error: false  # This will fail the workflow if quality gate fails
 
-      # Optional: SonarQube analysis for pull request
-      # - name: SonarQube PR Analysis
-      #   if: github.event_name == 'pull_request'
-      #   uses: sonarsource/sonarcloud-github-action@v2
-      #   with:
-      #     sonar-project-key: "Swigy-01"
-      #     sonar-host-url: "http://your-sonarqube-server-url"
-      #     sonar-project-name: "Swigy-01"
-      #   env:
-      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      Optional: SonarQube analysis for pull request
+      - name: SonarQube PR Analysis
+        if: github.event_name == 'pull_request'
+        uses: sonarsource/sonarcloud-github-action@v2
+        with:
+          sonar-project-key: "Swigy-01"
+          sonar-host-url: "http://your-sonarqube-server-url"
+          sonar-project-name: "Swigy-01"
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
       - name: Create ECR repository (if not exists)
         run: |
