@@ -52,17 +52,28 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           args: >
-            -Dsonar.organization=rekhugopal
-            -Dsonar.projectKey=SonarCloudCodeAnalyisis
+            -Dsonar.organization=manoj7894
+            -Dsonar.projectKey=Swigy-Project
             -Dsonar.sources=.
 
-      # SonarQube Quality Gate Check
       - name: Wait for SonarCloud Quality Gate
-        uses: sonarsource/sonarcloud-quality-gate-action@master
-        with:
-          projectKey: SonarCloudCodeAnalyisis
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          echo "Waiting for SonarCloud Quality Gate result..."
+          for i in {1..10}; do
+            STATUS=$(curl -s -u "${{ secrets.SONAR_TOKEN }}:" \
+              "https://sonarcloud.io/api/qualitygates/project_status?projectKey=Swigy-Project" | jq -r .projectStatus.status)
+            echo "Current Quality Gate status: $STATUS"
+            if [ "$STATUS" = "OK" ]; then
+              echo "Quality Gate passed."
+              exit 0
+            elif [ "$STATUS" = "ERROR" ]; then
+              echo "Quality Gate failed."
+              exit 1
+            fi
+            sleep 30
+          done
+          echo "Quality Gate check timed out."
+          exit 1
 
       - name: Create ECR repository (if not exists)
         run: |
