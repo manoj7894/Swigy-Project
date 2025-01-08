@@ -55,6 +55,7 @@ jobs:
             -Dsonar.organization=manoj7894
             -Dsonar.projectKey=Swigy-Project
             -Dsonar.sources=.
+            -Dsonar.branch.name=main
 
       - name: Wait for SonarCloud Quality Gate
         run: |
