@@ -1,50 +1,136 @@
-# OWASP Dependency-Check
+name: Node.js Docker Image Deploy into ECR
+
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+    branches:
+      - "main"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'  # Set your Node.js version here
+
+      - name: Check if npm is available
+        id: check_npm
+        run: |
+          if ! command -v npm &> /dev/null
+          then
+            echo "npm not found, skipping npm install, build, and test."
+            echo "npm_found=false" >> $GITHUB_ENV
+          else
+            echo "npm found, proceeding with npm install, build, and test."
+            echo "npm_found=true" >> $GITHUB_ENV
+          fi
+
+      # Uncomment the following block if you want to run npm install, build, and test
+      - name: Install dependencies, build, and test
+        if: env.npm_found == 'true'
+        run: |
+          npm install
+          npm run build --if-present
+          npm run test --if-present
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Install Trivy
+        run: |
+          curl -sfL https://github.com/aquasecurity/trivy/releases/download/v0.39.0/trivy_0.39.0_Linux-64bit.deb -o trivy.deb
+          sudo dpkg -i trivy.deb
+
+      - name: Trivy filesystem scan
+        run: |
+          trivy fs --format table -o fs-report.html .
+
+      # OWASP Dependency-Check
       - name: Install OWASP Dependency-Check
         run: |
-          # Download the Dependency-Check ZIP file (use the latest available version)
-          wget https://github.com/jeremylong/DependencyCheck/releases/download/v11.1.1/dependency-check-11.1.1-release.zip
-
-          # Check if the file was downloaded successfully (use the correct file name)
-          if [ ! -f dependency-check-11.1.1-release.zip ]; then
-            echo "Error: Dependency-Check zip file download failed!"
-            exit 1
-          fi
-
-          # Verify the downloaded file size (ensure it's not empty)
-          file_size=$(stat -c %s dependency-check-11.1.1-release.zip)
-          if [ "$file_size" -le 0 ]; then
-            echo "Error: The downloaded file is empty!"
-            exit 1
-          fi
-
-          # Ensure the file is a valid zip file
-          if ! unzip -t dependency-check-11.1.1-release.zip; then
-            echo "Error: Invalid zip file."
-            exit 1
-          fi
-
-          # Unzip the file
-          unzip dependency-check-11.1.1-release.zip
-
-          # List the contents of the unzip directory to check the structure
-          ls -al
-
-          # Check if the extracted folder exists
-          if [ ! -d "dependency-check" ]; then
-            echo "Error: dependency-check directory not found!"
-            exit 1
-          fi
-
-          # Navigate to the correct directory
-          cd dependency-check
-
-          # Check the version of Dependency-Check
-          ./bin/dependency-check.sh --version
+          curl -LO https://github.com/jeremylong/DependencyCheck/releases/download/v8.3.2/dependency-check-8.3.2-release.zip
+          unzip dependency-check-8.3.2-release.zip
+          ./dependency-check/bin/dependency-check.sh --version
 
       - name: Run OWASP Dependency-Check
         run: |
-          # Ensure the script is in the correct directory after unzip
-          cd dependency-check
+          ./dependency-check/bin/dependency-check.sh --project "NodeJS App" --scan . --out ./dependency-check-report
 
-          # Run Dependency-Check to scan the project and generate the report
-          ./bin/dependency-check.sh --project "NodeJS App" --scan . --out ./dependency-check-report
+      # Code Scan For SonarQube    
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      # Quality Gate For SonarQube    
+      - name: SonarQube Quality Gate check
+        id: quality-gate
+        uses: sonarsource/sonarqube-quality-gate-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      - name: Fail if Quality Gate fails
+        if: steps.quality-gate.outputs.quality_gate_status != 'passed'
+        run: |
+          echo "SonarQube Quality Gate failed!"
+          exit 1
+
+      - name: Build Docker image
+        run: |
+          docker build -t nodejsk1 .
+
+      # Trivy Image Scan
+      - name: Trivy image scan
+        run: |
+          trivy image nodejsk1 > trivy.txt
+
+      - name: Create ECR repository (if not exists)
+        run: |
+          REPOSITORY_NAME=nodejs-docker-repo
+          aws ecr describe-repositories --repository-names $REPOSITORY_NAME || aws ecr create-repository --repository-name $REPOSITORY_NAME
+
+      - name: Log in to Amazon ECR
+        run: |
+          aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com
+
+      - name: Tag Docker image for ECR
+        run: |
+          docker tag nodejsk1:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/nodejs-docker-repo:latest
+
+      - name: Push Docker image to ECR
+        run: |
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/nodejs-docker-repo:latest
+
+      # Upload OWASP Dependency-Check report
+      - name: Upload OWASP Dependency-Check report
+        uses: actions/upload-artifact@v3
+        with:
+          name: dependency-check-report
+          path: ./dependency-check-report
+
+      # Upload Trivy filesystem scan report
+      - name: Upload Trivy filesystem scan report
+        uses: actions/upload-artifact@v3
+        with:
+          name: trivy-filesystem-scan-report
+          path: fs-report.html
+
+      # Upload Trivy image scan report
+      - name: Upload Trivy image scan report
+        uses: actions/upload-artifact@v3
+        with:
+          name: trivy-image-scan-report
+          path: trivy.txt
