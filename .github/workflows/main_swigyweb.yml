@@ -84,8 +84,19 @@ jobs:
           # Unzip the file
           unzip dependency-check-11.1.1-release.zip
 
-          # Navigate to the folder where the binary is located and check the version of Dependency-Check
+          # List the contents of the unzip directory to check the structure
+          ls -al
+
+          # Check if the extracted folder exists
+          if [ ! -d "dependency-check-11.1.1" ]; then
+            echo "Error: dependency-check-11.1.1 directory not found!"
+            exit 1
+          fi
+
+          # Navigate to the correct directory
           cd dependency-check-11.1.1
+
+          # Check the version of Dependency-Check
           ./bin/dependency-check.sh --version
 
       - name: Run OWASP Dependency-Check
