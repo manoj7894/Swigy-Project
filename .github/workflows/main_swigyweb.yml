@@ -68,7 +68,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         continue-on-error: false  # This will fail the workflow if quality gate fails
 
-      Optional: SonarQube analysis for pull request
+      # Optional: SonarQube analysis for pull request
       - name: SonarQube PR Analysis
         if: github.event_name == 'pull_request'
         uses: sonarsource/sonarcloud-github-action@v2
