@@ -32,13 +32,13 @@ jobs:
             echo "npm_found=true" >> $GITHUB_ENV
           fi
 
-      # # Uncomment the following block if you want to run npm install, build, and test
-      # - name: Install dependencies, build, and test
-      #   if: env.npm_found == 'true'
-      #   run: |
-      #     npm install
-      #     npm run build --if-present
-      #     npm run test --if-present
+      # Uncomment the following block if you want to run npm install, build, and test
+      - name: Install dependencies, build, and test
+        if: env.npm_found == 'true'
+        run: |
+          npm install
+          npm run build --if-present
+          npm run test --if-present
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -123,7 +123,7 @@ jobs:
       # Trivy Image Scan
       - name: Trivy image scan
         run: |
-          trivy image nodejsk1:${{ env.build_tag }} > trivy.txt
+          trivy fs --format table -o image.html nodejsk1:${{ env.build_tag }}
 
       - name: Create ECR repository (if not exists)
         run: |
@@ -161,7 +161,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: trivy-image-scan-report
-          path: trivy.txt
+          path: image.html
 
       - name: Send email notification
         if: always()
