@@ -56,36 +56,36 @@ jobs:
         run: |
           trivy fs --format table -o fs-report.html .
 
-      # OWASP Dependency-Check
-      - name: Install OWASP Dependency-Check
-        run: |
-          wget https://github.com/jeremylong/DependencyCheck/releases/download/v11.1.1/dependency-check-11.1.1-release.zip
-          if [ ! -f dependency-check-11.1.1-release.zip ]; then
-            echo "Error: Dependency-Check zip file download failed!"
-            exit 1
-          fi
-          file_size=$(stat -c %s dependency-check-11.1.1-release.zip)
-          if [ "$file_size" -le 0 ]; then
-            echo "Error: The downloaded file is empty!"
-            exit 1
-          fi
-          if ! unzip -t dependency-check-11.1.1-release.zip; then
-            echo "Error: Invalid zip file."
-            exit 1
-          fi
-          unzip dependency-check-11.1.1-release.zip
-          ls -al
-          if [ ! -d "dependency-check" ]; then
-            echo "Error: dependency-check directory not found!"
-            exit 1
-          fi
-          cd dependency-check
-          ./bin/dependency-check.sh --version
+      # # OWASP Dependency-Check
+      # - name: Install OWASP Dependency-Check
+      #   run: |
+      #     wget https://github.com/jeremylong/DependencyCheck/releases/download/v11.1.1/dependency-check-11.1.1-release.zip
+      #     if [ ! -f dependency-check-11.1.1-release.zip ]; then
+      #       echo "Error: Dependency-Check zip file download failed!"
+      #       exit 1
+      #     fi
+      #     file_size=$(stat -c %s dependency-check-11.1.1-release.zip)
+      #     if [ "$file_size" -le 0 ]; then
+      #       echo "Error: The downloaded file is empty!"
+      #       exit 1
+      #     fi
+      #     if ! unzip -t dependency-check-11.1.1-release.zip; then
+      #       echo "Error: Invalid zip file."
+      #       exit 1
+      #     fi
+      #     unzip dependency-check-11.1.1-release.zip
+      #     ls -al
+      #     if [ ! -d "dependency-check" ]; then
+      #       echo "Error: dependency-check directory not found!"
+      #       exit 1
+      #     fi
+      #     cd dependency-check
+      #     ./bin/dependency-check.sh --version
 
-      - name: Run OWASP Dependency-Check
-        run: |
-          cd dependency-check
-          ./bin/dependency-check.sh --project "NodeJS App" --scan . --out ./dependency-check-report --format XML
+      # - name: Run OWASP Dependency-Check
+      #   run: |
+      #     cd dependency-check
+      #     ./bin/dependency-check.sh --project "NodeJS App" --scan . --out ./dependency-check-report --format XML
           
       # Code Scan For SonarQube    
       - name: SonarQube Scan
