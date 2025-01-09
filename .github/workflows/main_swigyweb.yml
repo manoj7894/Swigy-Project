@@ -123,7 +123,7 @@ jobs:
       # Trivy Image Scan
       - name: Trivy image scan
         run: |
-          trivy fs --format table -o image.html nodejsk1:${{ env.build_tag }}
+          trivy image --format table -o image.html nodejsk1:${{ env.build_tag }}
 
       - name: Create ECR repository (if not exists)
         run: |
