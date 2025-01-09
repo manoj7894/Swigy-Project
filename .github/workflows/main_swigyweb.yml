@@ -85,7 +85,14 @@ jobs:
       - name: Run OWASP Dependency-Check
         run: |
           cd dependency-check
-          ./bin/dependency-check.sh --project "NodeJS App" --scan . --out ./dependency-check-report
+          ./bin/dependency-check.sh --project "NodeJS App" --scan . --out ./dependency-check-report --format XML
+
+      # Upload OWASP Dependency-Check report
+      - name: Upload OWASP Dependency-Check report
+        uses: actions/upload-artifact@v3
+        with:
+          name: dependency-check-report
+          path: ./dependency-check-report/dependency-check-report.xml
           
       # Code Scan For SonarQube    
       - name: SonarQube Scan
@@ -147,7 +154,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: dependency-check-report
-          path: ./dependency-check-report
+          path: ./dependency-check-report/dependency-check-report.xml
 
       # Upload Trivy filesystem scan report
       - name: Upload Trivy filesystem scan report
@@ -183,4 +190,4 @@ jobs:
           attachments: |
             fs-report.html
             trivy.txt
-            dependency-check-report
+            ./dependency-check-report/dependency-check-report.xml
