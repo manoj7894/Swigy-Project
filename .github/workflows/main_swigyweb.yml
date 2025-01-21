@@ -46,13 +46,6 @@ jobs:
       #     npm run build --if-present
       #     npm run test --if-present
 
-      # - name: Configure AWS Credentials
-      #   uses: aws-actions/configure-aws-credentials@v1
-      #   with:
-      #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #     aws-region: $AWS_REGION
-
       - name: Install Trivy
         run: |
           curl -sfL https://github.com/aquasecurity/trivy/releases/download/v0.39.0/trivy_0.39.0_Linux-64bit.deb -o trivy.deb
@@ -61,6 +54,18 @@ jobs:
       - name: Trivy filesystem scan
         run: |
           trivy fs --format table -o fs-report.html .
+
+      # - name: Install OWASP Dependency-Check
+      #   run: |
+      #     wget https://github.com/jeremylong/DependencyCheck/releases/download/v11.1.1/dependency-check-11.1.1-release.zip
+      #     unzip dependency-check-11.1.1-release.zip
+      #     cd dependency-check
+      #     ./bin/dependency-check.sh --version
+
+      # - name: Run OWASP Dependency-Check
+      #   run: |
+      #     cd dependency-check
+      #     ./bin/dependency-check.sh --project "NodeJS App" --scan . --out ./dependency-check-report --format XML
 
       - name: Clean up previous Docker images and volumes
         run: |
