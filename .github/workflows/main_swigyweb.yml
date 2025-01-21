@@ -16,6 +16,7 @@ jobs:
       AWS_REGION: ap-south-1
       ECR_REPO_NAME: frissly-docker-repo  # Replace this with your repository name
       DOCKER_IMAGE_NAME: frissly-backend
+      CONTAINER_NAME: frissly-container  # Added container name
       
     steps:
       - name: Checkout code
