@@ -11,6 +11,12 @@ on:
 jobs:
   build:
     runs-on: self-hosted
+    
+    env:
+      AWS_REGION: ap-south-1
+      ECR_REPO_NAME: frissly-docker-repo  # Replace this with your repository name
+      DOCKER_IMAGE_NAME: frissly-backend
+      
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -32,20 +38,19 @@ jobs:
             echo "npm_found=true" >> $GITHUB_ENV
           fi
 
-      # # Uncomment the following block if you want to run npm install, build, and test
-      # - name: Install dependencies, build, and test
-      #   if: env.npm_found == 'true'
-      #   run: |
-      #     npm install
-      #     npm run build --if-present
-      #     npm run test --if-present
+      - name: Install dependencies, build, and test
+        if: env.npm_found == 'true'
+        run: |
+          npm install
+          npm run build --if-present
+          npm run test --if-present
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-1
+          aws-region: $AWS_REGION
 
       - name: Install Trivy
         run: |
@@ -56,131 +61,77 @@ jobs:
         run: |
           trivy fs --format table -o fs-report.html .
 
-      # # OWASP Dependency-Check
-      # - name: Install OWASP Dependency-Check
-      #   run: |
-      #     wget https://github.com/jeremylong/DependencyCheck/releases/download/v11.1.1/dependency-check-11.1.1-release.zip
-      #     if [ ! -f dependency-check-11.1.1-release.zip ]; then
-      #       echo "Error: Dependency-Check zip file download failed!"
-      #       exit 1
-      #     fi
-      #     file_size=$(stat -c %s dependency-check-11.1.1-release.zip)
-      #     if [ "$file_size" -le 0 ]; then
-      #       echo "Error: The downloaded file is empty!"
-      #       exit 1
-      #     fi
-      #     if ! unzip -t dependency-check-11.1.1-release.zip; then
-      #       echo "Error: Invalid zip file."
-      #       exit 1
-      #     fi
-      #     unzip dependency-check-11.1.1-release.zip
-      #     ls -al
-      #     if [ ! -d "dependency-check" ]; then
-      #       echo "Error: dependency-check directory not found!"
-      #       exit 1
-      #     fi
-      #     cd dependency-check
-      #     ./bin/dependency-check.sh --version
-
-      # - name: Run OWASP Dependency-Check
-      #   run: |
-      #     cd dependency-check
-      #     ./bin/dependency-check.sh --project "NodeJS App" --scan . --out ./dependency-check-report --format XML
-          
-      # Code Scan For SonarQube    
-      - name: SonarQube Scan
-        uses: sonarsource/sonarqube-scan-action@master
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-
-      # # Quality Gate For SonarQube    
-      # - name: SonarQube Quality Gate check
-      #   id: quality-gate
-      #   uses: sonarsource/sonarqube-quality-gate-action@master
-      #   env:
-      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      #     SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-
-      # - name: Fail if Quality Gate fails
-      #   if: steps.quality-gate.outputs.quality_gate_status != 'passed'
-      #   run: |
-      #     echo "SonarQube Quality Gate failed!"
-      #     exit 1
-
-      - name: Generate build image tag
-        id: build_tag
+      - name: Clean up previous Docker images and volumes
         run: |
-          # Generate a version-based tag with a prefix and timestamp
-          BUILD_TAG="v$(date +%Y%m%d%H%M%S)-${{ github.run_number }}"
-          echo "build_tag=$BUILD_TAG" >> $GITHUB_ENV
-          echo "Docker image will be tagged as: $BUILD_TAG"
-
+          docker ps -aq --filter "name=${CONTAINER_NAME}" | xargs -I {} docker stop {} || true
+          docker ps -aq --filter "name=${CONTAINER_NAME}" | xargs -I {} docker rm {} || true
+          docker images --filter "reference=$DOCKER_IMAGE_NAME*" -q | xargs -I {} docker rmi -f {} || true
+          docker builder prune -f || true
+          docker container prune -f || true
+          docker network prune -f || true
+ 
       - name: Build Docker image
         run: |
-          docker build -t nodejsk1:${{ env.build_tag }} .
+          docker build -t $DOCKER_IMAGE_NAME .
 
-      # Trivy Image Scan
       - name: Trivy image scan
         run: |
-          trivy image --format table -o image.html nodejsk1:${{ env.build_tag }}
+          trivy image --format table -o image.html $DOCKER_IMAGE_NAME
 
-      - name: Create ECR repository (if not exists)
+      - name: Run Docker container
         run: |
-          REPOSITORY_NAME=nodejs-docker-repo
-          aws ecr describe-repositories --repository-names $REPOSITORY_NAME || aws ecr create-repository --repository-name $REPOSITORY_NAME
+          docker run -itd --name $CONTAINER_NAME -p 3000:3000 $DOCKER_IMAGE_NAME
+          
 
-      - name: Log in to Amazon ECR
+      # - name: Verify attachment files
+      #   run: |
+      #     ls -al fs-report.html || echo "fs-report.html not found!"
+      #     ls -al image.html || echo "image.html not found!"
+      #     ls -al ./dependency-check/dependency-check-report/dependency-check-report.xml || echo "dependency-check-report.xml not found!"
+
+      # - name: Upload OWASP Dependency-Check report
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: dependency-check-report
+      #     path: ./dependency-check/dependency-check-report/dependency-check-report.xml
+
+      # - name: Upload Trivy filesystem scan report
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: trivy-filesystem-scan-report
+      #     path: fs-report.html
+
+      # - name: Upload Trivy image scan report
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: trivy-image-scan-report
+      #     path: image.html
+          
+
+      # - name: Send email notification
+      #   if: always()
+      #   uses: dawidd6/action-send-mail@v3
+      #   with:
+      #     server_address: smtp.gmail.com
+      #     server_port: 587
+      #     username: ${{ secrets.SMTP_USER }}
+      #     password: ${{ secrets.SMTP_PASS }}
+      #     subject: "GitHub Actions Build Status - ${{ github.workflow }} ${{ job.status }}"
+      #     body: |
+      #       The build for ${{ github.repository }} has completed.
+
+      #       Status: ${{ job.status }}
+      #       Commit: ${{ github.sha }}
+      #       Branch: ${{ github.ref }}
+      #     to: "varmapotthuri4@gmail.com"
+      #     from: "sender@example.com"
+      #     attachments: |
+      #       fs-report.html
+      #       image.html
+      #       ./dependency-check/dependency-check-report/dependency-check-report.xml
+
+        # Clean up entire workspace after the job completes
+      - name: Clean up workspace
         run: |
-          aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com
-
-      - name: Tag Docker image for ECR
-        run: |
-          docker tag nodejsk1:${{ env.build_tag }} ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/nodejs-docker-repo:${{ env.build_tag }}
-
-      - name: Push Docker image to ECR
-        run: |
-          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/nodejs-docker-repo:${{ env.build_tag }}
-
-      # Upload OWASP Dependency-Check report
-      - name: Upload OWASP Dependency-Check report
-        uses: actions/upload-artifact@v3
-        with:
-          name: dependency-check-report
-          path: ./dependency-check-report/dependency-check-report.xml
-
-      # Upload Trivy filesystem scan report
-      - name: Upload Trivy filesystem scan report
-        uses: actions/upload-artifact@v3
-        with:
-          name: trivy-filesystem-scan-report
-          path: fs-report.html
-
-      # Upload Trivy image scan report
-      - name: Upload Trivy image scan report
-        uses: actions/upload-artifact@v3
-        with:
-          name: trivy-image-scan-report
-          path: image.html
-
-      - name: Send email notification
-        if: always()
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 587
-          username: ${{ secrets.SMTP_USER }}
-          password: ${{ secrets.SMTP_PASS }}
-          subject: "GitHub Actions Build Status - ${{ github.workflow }} ${{ job.status }}"
-          body: |
-            The build for ${{ github.repository }} has completed.
-
-            Status: ${{ job.status }}
-            Commit: ${{ github.sha }}
-            Branch: ${{ github.ref }}
-          to: "varmapotthuri4@gmail.com"
-          from: "sender@example.com"
-          attachments: |
-            fs-report.html
-            trivy.txt
-            ./dependency-check-report/dependency-check-report.xml
+          echo "Cleaning up entire workspace to save disk space..."
+          rm -rf *
