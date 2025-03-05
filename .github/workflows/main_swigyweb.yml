@@ -149,9 +149,8 @@ jobs:
             pm2 start npm --name "myapp" -- run start
             pm2 save
 
-            # ✅ Set Up PM2 to Restart on Reboot
-            pm2 startup systemd -u azureuser --hp /home/azureuser
-            sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u azureuser --hp /home/azureuser
+            # ✅ Set Up PM2 to Restart on Reboot (Fixed for Exit Code 1)
+            sudo -u azureuser -i -- pm2 startup systemd
 
             # ✅ Ensure Port 3000 is Open
             sudo ufw allow 3000 || true
