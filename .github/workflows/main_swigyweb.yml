@@ -137,8 +137,13 @@ jobs:
               git pull origin main
             fi
 
-            # ✅ Install Node.js Dependencies
-            npm install
+            # ✅ Ensure package.json exists before running npm install
+            if [ -f package.json ]; then
+              npm install
+            else
+              echo "Error: package.json not found in repository. Check repository structure."
+              exit 1
+            fi
 
             # ✅ Start Node.js App using PM2 (on Port 3000)
             pm2 delete myapp || true  # Remove any previous instance
