@@ -107,7 +107,7 @@ jobs:
       - name: Verify SSH Connection
         run: ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa azureuser@${{ env.ip }} "echo SSH Connection Successful"
 
-      # ✅ Install Dependencies and Deploy Node.js App
+      # ✅ Install Dependencies and Deploy Node.js App (Without PM2)
       - name: Install Dependencies and Deploy Node.js App
         run: |
           ssh -tt -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa azureuser@${{ env.ip }} << 'EOF'
@@ -117,7 +117,7 @@ jobs:
             sudo apt update -y && sudo apt upgrade -y --allow-downgrades --allow-change-held-packages
 
             echo "Installing required dependencies..."
-            sudo apt install -y curl git unzip software-properties-common build-essential
+            sudo apt install -y curl git unzip software-properties-common
 
             echo "Checking if Node.js is already installed..."
             if ! command -v node &> /dev/null; then
@@ -144,20 +144,13 @@ jobs:
                 cd Swigy-Project
             fi
 
-            echo "Removing old node_modules..."
-            rm -rf node_modules package-lock.json
-
             echo "Installing project dependencies..."
-            npm ci
+            npm install
 
-            echo "Ensuring html-webpack-plugin is installed..."
-            npm install --save-dev html-webpack-plugin
-
-            echo "Starting the application with nohup..."
+            echo "Starting the application (without PM2)..."
             nohup npm start > output.log 2>&1 &
 
             echo "Ensuring Port 3000 is Open..."
             sudo ufw allow 3000 || true
 
-            echo "Deployment successful!"
           EOF
