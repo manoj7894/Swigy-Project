@@ -107,27 +107,30 @@ jobs:
       - name: Verify SSH Connection
         run: ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa azureuser@${{ env.ip }} "echo SSH Connection Successful"
 
-      # ✅ Install Dependencies and Deploy Node.js App
+      # ✅ Install Dependencies and Deploy Node.js App (Without PM2)
       - name: Install Dependencies and Deploy Node.js App
         run: |
           ssh -tt -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa azureuser@${{ env.ip }} << 'EOF'
-          
+
             echo "Updating system packages..."
             export DEBIAN_FRONTEND=noninteractive
             sudo apt update -y && sudo apt upgrade -y --allow-downgrades --allow-change-held-packages
 
-            echo "Checking current Node.js version..."
-            node -v || echo "Node.js is not installed."
+            echo "Installing required dependencies..."
+            sudo apt install -y curl git unzip software-properties-common
 
-            echo "Installing Node.js 18 (latest LTS) and npm..."
-            curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-            sudo apt install -y nodejs
+            echo "Checking if Node.js is already installed..."
+            if ! command -v node &> /dev/null; then
+              echo "Installing Node.js 18 (LTS) and npm..."
+              curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+              sudo apt install -y nodejs
+            fi
 
-            echo "Verifying installed versions..."
+            echo "Verifying Node.js & npm versions..."
             node -v
             npm -v
 
-            echo "Updating npm packages..."
+            echo "Updating npm to the latest version..."
             npm install -g npm@latest
 
             echo "Cloning or updating the project repository..."
@@ -144,14 +147,10 @@ jobs:
             echo "Installing project dependencies..."
             npm install
 
-            echo "Building and starting the application..."
-            npm run build
-            pm2 delete myapp 2>/dev/null || true
-            pm2 start npm --name "myapp" -- run start
-            pm2 save
-            sudo -u azureuser -i -- pm2 startup systemd
+            echo "Starting the application (without PM2)..."
+            nohup npm start > output.log 2>&1 &
 
             echo "Ensuring Port 3000 is Open..."
             sudo ufw allow 3000 || true
-          
+
           EOF
