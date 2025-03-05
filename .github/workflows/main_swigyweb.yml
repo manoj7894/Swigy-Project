@@ -1,143 +1,157 @@
-name: Node.js Docker Image Deploy into ECR
+name: Deploy Node.js App to Azure VM
 
 on:
   push:
     branches:
-      - "main"
-  pull_request:
-    branches:
-      - "main"
+      - main
 
 jobs:
-  build:
-    runs-on: self-hosted
-    
-    env:
-      AWS_REGION: ap-south-1
-      ECR_REPO_NAME: frissly-docker-repo  # Replace this with your repository name
-      DOCKER_IMAGE_NAME: frissly-backend
-      CONTAINER_NAME: frissly-container  # Added container name
-      
+  deploy:
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '16'  # Set your Node.js version here
-
-      - name: Check if npm is available
-        id: check_npm
+      # ✅ Generate SSH Key Pair
+      - name: Generate SSH Key Pair
         run: |
-          if ! command -v npm &> /dev/null
-          then
-            echo "npm not found, skipping npm install, build, and test."
-            echo "npm_found=false" >> $GITHUB_ENV
-          else
-            echo "npm found, proceeding with npm install, build, and test."
-            echo "npm_found=true" >> $GITHUB_ENV
+          mkdir -p ~/.ssh
+          ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""
+          chmod 600 ~/.ssh/id_rsa
+
+      # ✅ Upload SSH Key as Artifact
+      - name: Upload SSH Key as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ssh-key
+          path: ~/.ssh/id_rsa
+
+      # ✅ Login to Azure
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: >
+            {
+              "clientId":"${{ secrets.AZURE_CLIENT_ID }}",
+              "clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}",
+              "tenantId":"${{ secrets.AZURE_TENANT_ID }}",
+              "subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+            }
+
+      # ✅ Ensure Resource Group Exists
+      - name: Ensure Resource Group Exists
+        run: az group create --name test-rg --location eastus --output none || true
+
+      # ✅ Ensure Virtual Machine Exists
+      - name: Ensure Virtual Machine Exists
+        run: |
+          if ! az vm show --resource-group test-rg --name test-vm --query 'name' --output tsv; then
+            az vm create \
+              --resource-group test-rg \
+              --name test-vm \
+              --image Ubuntu2204 \
+              --admin-username azureuser \
+              --public-ip-sku Standard \
+              --size Standard_B2s \
+              --output none
           fi
 
-      # - name: Install dependencies, build, and test
-      #   if: env.npm_found == 'true'
-      #   run: |
-      #     npm install
-      #     npm run build --if-present
-      #     npm run test --if-present
-
-      - name: Install Trivy
+      # ✅ Ensure Security Group Allows SSH (22) and Node.js (3000)
+      - name: Open Ports 22 and 3000 in Security Group
         run: |
-          curl -sfL https://github.com/aquasecurity/trivy/releases/download/v0.39.0/trivy_0.39.0_Linux-64bit.deb -o trivy.deb
-          sudo dpkg -i trivy.deb
+          az network nsg rule create \
+            --resource-group test-rg \
+            --nsg-name test-vmNSG \
+            --name AllowSSH \
+            --priority 1000 \
+            --direction Inbound \
+            --access Allow \
+            --protocol Tcp \
+            --source-port-ranges '*' \
+            --destination-port-ranges 22 || true
 
-      - name: Trivy filesystem scan
+          az network nsg rule create \
+            --resource-group test-rg \
+            --nsg-name test-vmNSG \
+            --name AllowNodeApp \
+            --priority 1010 \
+            --direction Inbound \
+            --access Allow \
+            --protocol Tcp \
+            --source-port-ranges '*' \
+            --destination-port-ranges 3000 || true
+
+      # ✅ Get VM Public IP
+      - name: Get VM Public IP
         run: |
-          trivy fs --format table -o fs-report.html .
+          ip=$(az vm list-ip-addresses \
+            --resource-group test-rg \
+            --name test-vm \
+            --query "[].virtualMachine.network.publicIpAddresses[0].ipAddress" \
+            --output tsv)
+          echo "VM Public IP: $ip"
+          echo "ip=$ip" >> $GITHUB_ENV
 
-      # - name: Install OWASP Dependency-Check
-      #   run: |
-      #     wget https://github.com/jeremylong/DependencyCheck/releases/download/v11.1.1/dependency-check-11.1.1-release.zip
-      #     unzip dependency-check-11.1.1-release.zip
-      #     cd dependency-check
-      #     ./bin/dependency-check.sh --version
+      # ✅ Download SSH Key from Artifact
+      - name: Download SSH Key from Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ssh-key
+          path: ~/.ssh
 
-      # - name: Run OWASP Dependency-Check
-      #   run: |
-      #     cd dependency-check
-      #     ./bin/dependency-check.sh --project "NodeJS App" --scan . --out ./dependency-check-report --format XML
+      # ✅ Set Correct Permissions for SSH Key
+      - name: Set Correct Permissions for SSH Key
+        run: chmod 600 ~/.ssh/id_rsa
 
-      - name: Clean up previous Docker images and volumes
+      # ✅ Manually Add SSH Public Key to VM
+      - name: Manually Add SSH Public Key to VM
         run: |
-          docker ps -aq --filter "name=${CONTAINER_NAME}" | xargs -I {} docker stop {} || true
-          docker ps -aq --filter "name=${CONTAINER_NAME}" | xargs -I {} docker rm {} || true
-          docker images --filter "reference=$DOCKER_IMAGE_NAME*" -q | xargs -I {} docker rmi -f {} || true
-          docker builder prune -f || true
-          docker container prune -f || true
-          docker network prune -f || true
- 
-      - name: Build Docker image
+          PUBLIC_KEY=$(cat ~/.ssh/id_rsa.pub)
+          az vm run-command invoke \
+            --resource-group test-rg \
+            --name test-vm \
+            --command-id RunShellScript \
+            --scripts "mkdir -p /home/azureuser/.ssh && echo \"$PUBLIC_KEY\" >> /home/azureuser/.ssh/authorized_keys && chmod 600 /home/azureuser/.ssh/authorized_keys && chown azureuser:azureuser /home/azureuser/.ssh/authorized_keys"
+
+      # ✅ Verify SSH Connection
+      - name: Verify SSH Connection
+        run: ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa azureuser@${{ env.ip }} "echo SSH Connection Successful"
+
+      # ✅ Install Dependencies and Deploy Node.js App
+      - name: Install Dependencies and Deploy Node.js App
         run: |
-          docker build -t $DOCKER_IMAGE_NAME .
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa azureuser@${{ env.ip }} << 'EOF'
+            set -e
 
-      - name: Trivy image scan
-        run: |
-          trivy image --format table -o image.html $DOCKER_IMAGE_NAME
+            # ✅ Update & Install Required Packages
+            sudo apt update
+            sudo apt install -y nodejs npm git
 
-      - name: Run Docker container
-        run: |
-          docker run -itd --name $CONTAINER_NAME -p 3000:3000 $DOCKER_IMAGE_NAME
-          
+            # ✅ Install PM2 for Process Management
+            sudo npm install -g pm2
 
-      # - name: Verify attachment files
-      #   run: |
-      #     ls -al fs-report.html || echo "fs-report.html not found!"
-      #     ls -al image.html || echo "image.html not found!"
-      #     ls -al ./dependency-check/dependency-check-report/dependency-check-report.xml || echo "dependency-check-report.xml not found!"
+            # ✅ Ensure App Directory Exists
+            mkdir -p ~/app
+            cd ~/app
 
-      # - name: Upload OWASP Dependency-Check report
-      #   uses: actions/upload-artifact@v3
-      #   with:
-      #     name: dependency-check-report
-      #     path: ./dependency-check/dependency-check-report/dependency-check-report.xml
+            # ✅ Handle First-Time Deployment & Updates
+            if [ ! -d .git ]; then
+              echo "First-time setup: Cloning repository..."
+              git clone https://${{ secrets.TOKEN_GITHUB }}@github.com/manoj7894/Swigy-Project.git .
+            else
+              echo "Repository exists: Pulling latest changes..."
+              git pull origin main
+            fi
 
-      # - name: Upload Trivy filesystem scan report
-      #   uses: actions/upload-artifact@v3
-      #   with:
-      #     name: trivy-filesystem-scan-report
-      #     path: fs-report.html
+            # ✅ Install Node.js Dependencies
+            npm install
 
-      # - name: Upload Trivy image scan report
-      #   uses: actions/upload-artifact@v3
-      #   with:
-      #     name: trivy-image-scan-report
-      #     path: image.html
-          
+            # ✅ Start Node.js App using PM2 (on Port 3000)
+            pm2 delete myapp || true  # Remove any previous instance
+            pm2 start npm --name "myapp" -- run start
+            pm2 save
+            pm2 startup systemd
 
-      # - name: Send email notification
-      #   if: always()
-      #   uses: dawidd6/action-send-mail@v3
-      #   with:
-      #     server_address: smtp.gmail.com
-      #     server_port: 587
-      #     username: ${{ secrets.SMTP_USER }}
-      #     password: ${{ secrets.SMTP_PASS }}
-      #     subject: "GitHub Actions Build Status - ${{ github.workflow }} ${{ job.status }}"
-      #     body: |
-      #       The build for ${{ github.repository }} has completed.
-
-      #       Status: ${{ job.status }}
-      #       Commit: ${{ github.sha }}
-      #       Branch: ${{ github.ref }}
-      #     to: "varmapotthuri4@gmail.com"
-      #     from: "sender@example.com"
-      #     attachments: |
-      #       fs-report.html
-      #       image.html
-      #       ./dependency-check/dependency-check-report/dependency-check-report.xml
-
-        # Clean up entire workspace after the job completes
-      - name: Clean up workspace
-        run: |
-          echo "Cleaning up entire workspace to save disk space..."
-          rm -rf *
+            # ✅ Ensure Port 3000 is Open
+            sudo ufw allow 3000 || true
+          EOF
