@@ -32,11 +32,7 @@ jobs:
         with:
           creds: '${{ secrets.AZURE_CREDENTIALS }}'
 
-      # ✅ Ensure Resource Group Exists
-      - name: Ensure Resource Group Exists
-        run: az group create --name manoj-rg --location eastus --output none || true
-
-      # ✅ Ensure Virtual Machine Exists
+      # ✅ Ensure VM Exists
       - name: Ensure Virtual Machine Exists
         run: |
           if ! az vm show --resource-group manoj-rg --name test-vm --query 'name' --output tsv; then
@@ -50,7 +46,7 @@ jobs:
               --output none
           fi
 
-      # ✅ Ensure Security Group Allows SSH (22) and Node.js (3000)
+      # ✅ Open Ports 22 and 3000 in Security Group
       - name: Open Ports 22 and 3000 in Security Group
         run: |
           az network nsg rule create \
@@ -146,11 +142,16 @@ jobs:
               exit 1
             fi
 
+            # ✅ Stop Previous Process if Running (Fix for "Process Not Found" Error)
+            pm2 delete myapp 2>/dev/null || true  # Suppress error if process not found
+
             # ✅ Start Node.js App using PM2 (on Port 3000)
-            pm2 delete myapp || true  # Remove any previous instance
             pm2 start npm --name "myapp" -- run start
             pm2 save
-            pm2 startup systemd
+
+            # ✅ Set Up PM2 to Restart on Reboot
+            pm2 startup systemd -u azureuser --hp /home/azureuser
+            sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u azureuser --hp /home/azureuser
 
             # ✅ Ensure Port 3000 is Open
             sudo ufw allow 3000 || true
