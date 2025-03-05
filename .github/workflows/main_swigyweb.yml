@@ -131,7 +131,7 @@ jobs:
             # ✅ Handle First-Time Deployment & Updates
             if [ ! -d .git ]; then
               echo "First-time setup: Cloning repository..."
-              git clone https://${{ secrets.TOKEN_GITHUB }}@github.com/manoj7894/Swigy-Project.git .
+              git clone https://${{ secrets.GIT_TOKEN }}@github.com/manoj7894/Swigy-Project.git .
             else
               echo "Repository exists: Pulling latest changes..."
               git pull origin main
