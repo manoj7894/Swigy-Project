@@ -128,12 +128,14 @@ jobs:
             cd /home/azureuser
 
             # ✅ Handle First-Time Deployment & Updates
-            if [ ! -d .git ]; then
-              echo "First-time setup: Cloning repository..."
-              git clone https://${{ secrets.GIT_TOKEN }}@github.com/manoj7894/Swigy-Project.git .
-            else
+            if [ -d ".git" ]; then
               echo "Repository exists: Pulling latest changes..."
+              git reset --hard origin/main  # Reset any local changes
               git pull origin main
+            else
+              echo "Cloning repository..."
+              rm -rf *  # Remove all existing files to prevent conflicts
+              git clone https://${{ secrets.GIT_TOKEN }}@github.com/manoj7894/Swigy-Project.git .
             fi
 
             # ✅ Ensure package.json exists before running npm install
