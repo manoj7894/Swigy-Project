@@ -1,6 +1,5 @@
 name: Deploy Node.js App to Azure VM
 
-
 on:
   push:
     branches:
