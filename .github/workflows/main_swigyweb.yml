@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-lamanoj
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -34,15 +34,15 @@ jobs:
 
       # ✅ Ensure Resource Group Exists
       - name: Ensure Resource Group Exists
-        run: az group create --name test-rg --location eastus --output none || true
+        run: az group create --name manoj-rg --location eastus --output none || true
 
       # ✅ Ensure Virtual Machine Exists
       - name: Ensure Virtual Machine Exists
         run: |
-          if ! az vm show --resource-group test-rg --name test-vm --query 'name' --output tsv; then
+          if ! az vm show --resource-group manoj-rg --name manoj-vm --query 'name' --output tsv; then
             az vm create \
-              --resource-group test-rg \
-              --name test-vm \
+              --resource-group manoj-rg \
+              --name manoj-vm \
               --image Ubuntu2204 \
               --admin-username azureuser \
               --public-ip-sku Standard \
@@ -54,8 +54,8 @@ jobs:
       - name: Open Ports 22 and 3000 in Security Group
         run: |
           az network nsg rule create \
-            --resource-group test-rg \
-            --nsg-name test-vmNSG \
+            --resource-group manoj-rg \
+            --nsg-name manoj-vmNSG \
             --name AllowSSH \
             --priority 1000 \
             --direction Inbound \
@@ -65,8 +65,8 @@ jobs:
             --destination-port-ranges 22 || true
 
           az network nsg rule create \
-            --resource-group test-rg \
-            --nsg-name test-vmNSG \
+            --resource-group manoj-rg \
+            --nsg-name manoj-vmNSG \
             --name AllowNodeApp \
             --priority 1010 \
             --direction Inbound \
@@ -79,8 +79,8 @@ jobs:
       - name: Get VM Public IP
         run: |
           ip=$(az vm list-ip-addresses \
-            --resource-group test-rg \
-            --name test-vm \
+            --resource-group manoj-rg \
+            --name manoj-vm \
             --query "[].virtualMachine.network.publicIpAddresses[0].ipAddress" \
             --output tsv)
           echo "VM Public IP: $ip"
@@ -102,8 +102,8 @@ jobs:
         run: |
           PUBLIC_KEY=$(cat ~/.ssh/id_rsa.pub)
           az vm run-command invoke \
-            --resource-group test-rg \
-            --name test-vm \
+            --resource-group manoj-rg \
+            --name manoj-vm \
             --command-id RunShellScript \
             --scripts "mkdir -p /home/azureuser/.ssh && echo \"$PUBLIC_KEY\" >> /home/azureuser/.ssh/authorized_keys && chmod 600 /home/azureuser/.ssh/authorized_keys && chown azureuser:azureuser /home/azureuser/.ssh/authorized_keys"
 
@@ -133,7 +133,7 @@ jobs:
               echo "First-time setup: Cloning repository..."
               git clone https://${{ secrets.GIT_TOKEN }}@github.com/Ayeesha208/Swigy-Project.git .
             else
-              echo "Repository exists: Pulling latest changes..."
+              echo "Repository exists: Pulling lamanoj changes..."
               git pull origin main
             fi
 
