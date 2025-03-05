@@ -107,51 +107,66 @@ jobs:
       - name: Verify SSH Connection
         run: ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa azureuser@${{ env.ip }} "echo SSH Connection Successful"
 
-      # ✅ Install Dependencies and Deploy Node.js App
-      - name: Install Dependencies and Deploy Node.js App
+      # ✅ Deploy Node.js App to VM
+      - name: Deploy Node.js App
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa azureuser@${{ env.ip }} << 'EOF'
-            set -e
+          ssh -tt -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa azureuser@${{ env.ip }} << 'EOF'
 
-            # ✅ Update & Install Required Packages
-            sudo apt update
-            sudo apt install -y nodejs npm git
+          # ✅ Update System Packages
+          echo "Updating system packages..."
+          sudo apt update -y && sudo apt upgrade -y
 
-            # ✅ Install PM2 for Process Management
-            sudo npm install -g pm2
+          # ✅ Install Node.js 18 and npm
+          echo "Installing Node.js 18 LTS..."
+          curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+          sudo apt install -y nodejs
 
-            # ✅ Navigate to Home Directory
-            cd /home/azureuser
+          # ✅ Verify Installation
+          echo "Node.js version: $(node -v)"
+          echo "npm version: $(npm -v)"
 
-            # ✅ Check if the directory is a Git repository
-            if [ -d ".git" ]; then
-              echo "Repository exists: Resetting and pulling latest changes..."
-              git reset --hard origin/main  # Reset any local changes
-              git pull origin main
-            else
-              echo "Not a Git repository. Cleaning directory and cloning fresh..."
-              rm -rf * .[^.]*  # Deletes all files & hidden files except . and ..
-              git clone https://${{ secrets.GIT_TOKEN }}@github.com/manoj7894/Swigy-Project.git .
-            fi
+          # ✅ Install PM2 for Process Management
+          echo "Installing PM2..."
+          sudo npm install -g pm2
 
-            # ✅ Ensure package.json exists before running npm install
-            if [ -f package.json ]; then
-              npm install
-            else
-              echo "Error: package.json not found in repository. Check repository structure."
-              exit 1
-            fi
+          # ✅ Navigate to App Directory
+          cd /home/azureuser
 
-            # ✅ Stop Previous Process if Running (Fix for "Process Not Found" Error)
-            pm2 delete myapp 2>/dev/null || true  # Suppress error if process not found
+          # ✅ Clone or Update Repository
+          if [ -d "Swigy-Project/.git" ]; then
+            echo "Updating existing repository..."
+            cd Swigy-Project
+            git reset --hard HEAD
+            git pull origin main
+          else
+            echo "Cloning fresh repository..."
+            rm -rf Swigy-Project
+            git clone https://${{ secrets.GIT_TOKEN }}@github.com/manoj7894/Swigy-Project.git
+            cd Swigy-Project
+          fi
 
-            # ✅ Start Node.js App using PM2 (on Port 3000)
-            pm2 start npm --name "myapp" -- run start
-            pm2 save
+          # ✅ Install Dependencies
+          if [ -f package.json ]; then
+            npm install
+          else
+            echo "Error: package.json not found!"
+            exit 1
+          fi
 
-            # ✅ Set Up PM2 to Restart on Reboot (Fixed for Exit Code 1)
-            sudo -u azureuser -i -- pm2 startup systemd
+          # ✅ Stop Previous PM2 Process (if any)
+          pm2 delete myapp || true
 
-            # ✅ Ensure Port 3000 is Open
-            sudo ufw allow 3000 || true
+          # ✅ Start App with PM2
+          echo "Starting application with PM2..."
+          pm2 start npm --name "myapp" -- run start
+          pm2 save
+          pm2 restart myapp
+
+          # ✅ Enable PM2 on Startup
+          sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u azureuser --hp /home/azureuser
+
+          # ✅ Open Port 3000
+          sudo ufw allow 3000 || true
+
+          echo "Deployment complete!"
           EOF
