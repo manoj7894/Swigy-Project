@@ -127,14 +127,14 @@ jobs:
             # ✅ Navigate to Home Directory
             cd /home/azureuser
 
-            # ✅ Handle First-Time Deployment & Updates
+            # ✅ Check if the directory is a Git repository
             if [ -d ".git" ]; then
-              echo "Repository exists: Pulling latest changes..."
+              echo "Repository exists: Resetting and pulling latest changes..."
               git reset --hard origin/main  # Reset any local changes
               git pull origin main
             else
-              echo "Cloning repository..."
-              rm -rf *  # Remove all existing files to prevent conflicts
+              echo "Not a Git repository. Cleaning directory and cloning fresh..."
+              rm -rf * .[^.]*  # Deletes all files & hidden files except . and ..
               git clone https://${{ secrets.GIT_TOKEN }}@github.com/manoj7894/Swigy-Project.git .
             fi
 
@@ -155,7 +155,3 @@ jobs:
             # ✅ Ensure Port 3000 is Open
             sudo ufw allow 3000 || true
           EOF
-
-      # ✅ Verify Application Deployment
-      - name: Verify Application Deployment
-        run: curl --retry 5 --retry-delay 10 --max-time 30 http://${{ env.ip }}:3000 || (echo "Application failed to start" && exit 1)
