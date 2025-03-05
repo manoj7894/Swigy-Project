@@ -26,17 +26,11 @@ jobs:
           name: ssh-key
           path: ~/.ssh/id_rsa
 
-      # ✅ Login to Azure
+      # ✅ Login to Azure (Fixed JSON format)
       - name: Login to Azure
         uses: azure/login@v1
         with:
-          creds: >
-            {
-              "clientId":"${{ secrets.AZURE_CLIENT_ID }}",
-              "clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}",
-              "tenantId":"${{ secrets.AZURE_TENANT_ID }}",
-              "subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}"
-            }
+          creds: '${{ secrets.AZURE_CREDENTIALS }}'
 
       # ✅ Ensure Resource Group Exists
       - name: Ensure Resource Group Exists
@@ -155,3 +149,7 @@ jobs:
             # ✅ Ensure Port 3000 is Open
             sudo ufw allow 3000 || true
           EOF
+
+      # ✅ Verify Application Deployment
+      - name: Verify Application Deployment
+        run: curl --retry 5 --retry-delay 10 --max-time 30 http://${{ env.ip }}:3000 || (echo "Application failed to start" && exit 1)
