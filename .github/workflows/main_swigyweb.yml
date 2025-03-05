@@ -12,27 +12,23 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # ✅ Generate SSH Key Pair
       - name: Generate SSH Key Pair
         run: |
           mkdir -p ~/.ssh
           ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""
           chmod 600 ~/.ssh/id_rsa
 
-      # ✅ Upload SSH Key as Artifact
       - name: Upload SSH Key as Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ssh-key
           path: ~/.ssh/id_rsa
 
-      # ✅ Login to Azure
       - name: Login to Azure
         uses: azure/login@v1
         with:
           creds: '${{ secrets.AZURE_CREDENTIALS }}'
 
-      # ✅ Ensure VM Exists
       - name: Ensure Virtual Machine Exists
         run: |
           if ! az vm show --resource-group manoj-rg --name test-vm --query 'name' --output tsv; then
@@ -46,7 +42,6 @@ jobs:
               --output none
           fi
 
-      # ✅ Open Ports 22 and 3000 in Security Group
       - name: Open Ports 22 and 3000 in Security Group
         run: |
           az network nsg rule create \
@@ -71,7 +66,6 @@ jobs:
             --source-port-ranges '*' \
             --destination-port-ranges 3000 || true
 
-      # ✅ Get VM Public IP
       - name: Get VM Public IP
         run: |
           ip=$(az vm list-ip-addresses \
@@ -82,18 +76,15 @@ jobs:
           echo "VM Public IP: $ip"
           echo "ip=$ip" >> $GITHUB_ENV
 
-      # ✅ Download SSH Key from Artifact
       - name: Download SSH Key from Artifact
         uses: actions/download-artifact@v4
         with:
           name: ssh-key
           path: ~/.ssh
 
-      # ✅ Set Correct Permissions for SSH Key
       - name: Set Correct Permissions for SSH Key
         run: chmod 600 ~/.ssh/id_rsa
 
-      # ✅ Manually Add SSH Public Key to VM
       - name: Manually Add SSH Public Key to VM
         run: |
           PUBLIC_KEY=$(cat ~/.ssh/id_rsa.pub)
@@ -103,11 +94,9 @@ jobs:
             --command-id RunShellScript \
             --scripts "mkdir -p /home/azureuser/.ssh && echo \"$PUBLIC_KEY\" >> /home/azureuser/.ssh/authorized_keys && chmod 600 /home/azureuser/.ssh/authorized_keys && chown azureuser:azureuser /home/azureuser/.ssh/authorized_keys"
 
-      # ✅ Verify SSH Connection
       - name: Verify SSH Connection
         run: ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa azureuser@${{ env.ip }} "echo SSH Connection Successful"
 
-      # ✅ Install Dependencies and Deploy Node.js App (Without PM2)
       - name: Install Dependencies and Deploy Node.js App
         run: |
           ssh -tt -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa azureuser@${{ env.ip }} << 'EOF'
@@ -144,10 +133,22 @@ jobs:
                 cd Swigy-Project
             fi
 
-            echo "Installing project dependencies..."
-            npm install
+            echo "Cleaning existing node_modules..."
+            rm -rf node_modules package-lock.json
 
-            echo "Starting the application (without PM2)..."
+            echo "Installing project dependencies..."
+            npm install --force
+
+            echo "Checking if html-webpack-plugin is installed..."
+            npm list html-webpack-plugin || npm install html-webpack-plugin --save-dev
+
+            echo "Ensuring Webpack and required plugins exist..."
+            npm install --save-dev webpack webpack-cli html-webpack-plugin
+
+            echo "Building the application..."
+            npm run build || npm run webpack
+
+            echo "Starting the application..."
             nohup npm start > output.log 2>&1 &
 
             echo "Ensuring Port 3000 is Open..."
