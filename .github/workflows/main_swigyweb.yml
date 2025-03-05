@@ -91,7 +91,7 @@ jobs:
             cd ~/app
 
             # ✅ Clone repository fresh
-            git clone https://${{ secrets.GIT_TOKEN }}@github.com/Ayeesha208/Python-Webapp.git .
+            git clone https://${{ secrets.GIT_TOKEN }}@github.com/manoj7894/Swigy-Project.git .
 
             # ✅ Verify repository content
             ls -la
