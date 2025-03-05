@@ -26,7 +26,7 @@ jobs:
           name: ssh-key
           path: ~/.ssh/id_rsa
 
-      # ✅ Login to Azure (Fixed JSON format)
+      # ✅ Login to Azure
       - name: Login to Azure
         uses: azure/login@v1
         with:
@@ -124,9 +124,8 @@ jobs:
             # ✅ Install PM2 for Process Management
             sudo npm install -g pm2
 
-            # ✅ Ensure App Directory Exists
-            mkdir -p ~/app
-            cd ~/app
+            # ✅ Navigate to Home Directory
+            cd /home/azureuser
 
             # ✅ Handle First-Time Deployment & Updates
             if [ ! -d .git ]; then
