@@ -337,7 +337,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      DOCKER_IMAGE_NAME: onruto-backend
+      DOCKER_IMAGE_NAME: primeslice-backend
       AWS_REGION: ap-south-1
 
     outputs:
@@ -417,10 +417,10 @@ jobs:
       - name: Set environment variables
         run: |
           if [[ "${GITHUB_REF##*/}" == "prod" ]]; then
-            echo "ECR_REPO_NAME=onruto-prod-docker-repo" >> $GITHUB_ENV
+            echo "ECR_REPO_NAME=primeslice-prod-docker-repo" >> $GITHUB_ENV
             echo "IMAGE_TAG=prod" >> $GITHUB_ENV
           else
-            echo "ECR_REPO_NAME=onruto-uat-docker-repo" >> $GITHUB_ENV
+            echo "ECR_REPO_NAME=primeslice-uat-docker-repo" >> $GITHUB_ENV
             echo "IMAGE_TAG=uat" >> $GITHUB_ENV
           fi
 
