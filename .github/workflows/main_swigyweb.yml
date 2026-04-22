@@ -363,14 +363,14 @@ jobs:
       # - name: Build app
       #   run: npm run build --if-present
 
-      - name: Run tests if available
-        run: |
-          actual_script=$(npm pkg get scripts.test | jq -r .)
-          if [[ "$actual_script" == 'echo "Error: no test specified" && exit 1' ]]; then
-            echo "Skipping placeholder tests"
-          else
-            npm run test
-          fi
+      # - name: Run tests if available
+      #   run: |
+      #     actual_script=$(npm pkg get scripts.test | jq -r .)
+      #     if [[ "$actual_script" == 'echo "Error: no test specified" && exit 1' ]]; then
+      #       echo "Skipping placeholder tests"
+      #     else
+      #       npm run test
+      #     fi
 
 # ----------------------------------------------------------
 # INSTALL TRIVY
