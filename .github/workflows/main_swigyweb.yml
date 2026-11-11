@@ -315,195 +315,198 @@
 
 
 
-name: Node.js Docker Build Scan Deploy
+# name: Node.js Docker Build Scan Deploy
 
 
-on:
-  push:
-    branches:
-      - main
-      - prod
-  pull_request:
-    branches:
-      - main
-      - prod
+# on:
+#   push:
+#     branches:
+#       - main
+#       - prod
+#   pull_request:
+#     branches:
+#       - main
+#       - prod
 
-jobs:
+# jobs:
 
-# ==========================================================
-# 1 BUILD + SECURITY SCAN
-# ==========================================================
-  build:
-    name: 1 Build and Security Scan
-    runs-on: ubuntu-latest
+# # ==========================================================
+# # 1 BUILD + SECURITY SCAN
+# # ==========================================================
+#   build:
+#     name: 1 Build and Security Scan
+#     runs-on: ubuntu-latest
 
-    env:
-      DOCKER_IMAGE_NAME: primeslice-backend
-      AWS_REGION: ap-south-1
+#     env:
+#       DOCKER_IMAGE_NAME: primeslice-backend
+#       AWS_REGION: ap-south-1
 
-    outputs:
-      branch: ${{ steps.branch.outputs.branch }}
+#     outputs:
+#       branch: ${{ steps.branch.outputs.branch }}
 
-    steps:
+#     steps:
 
-      - name: Checkout code
-        uses: actions/checkout@v4
+#       - name: Checkout code
+#         uses: actions/checkout@v4
 
-      - name: Get Branch Name
-        id: branch
-        run: echo "branch=${GITHUB_REF##*/}" >> $GITHUB_OUTPUT
+#       - name: Get Branch Name
+#         id: branch
+#         run: echo "branch=${GITHUB_REF##*/}" >> $GITHUB_OUTPUT
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
+#       - name: Set up Node.js
+#         uses: actions/setup-node@v3
+#         with:
+#           node-version: 18
 
-      - name: Install dependencies
-        run: npm install
+#       - name: Install dependencies
+#         run: npm install
 
-      # - name: Build app
-      #   run: npm run build --if-present
+#       # - name: Build app
+#       #   run: npm run build --if-present
 
-      # - name: Run tests if available
-      #   run: |
-      #     actual_script=$(npm pkg get scripts.test | jq -r .)
-      #     if [[ "$actual_script" == 'echo "Error: no test specified" && exit 1' ]]; then
-      #       echo "Skipping placeholder tests"
-      #     else
-      #       npm run test
-      #     fi
+#       # - name: Run tests if available
+#       #   run: |
+#       #     actual_script=$(npm pkg get scripts.test | jq -r .)
+#       #     if [[ "$actual_script" == 'echo "Error: no test specified" && exit 1' ]]; then
+#       #       echo "Skipping placeholder tests"
+#       #     else
+#       #       npm run test
+#       #     fi
 
-# ----------------------------------------------------------
-# INSTALL TRIVY
-# ----------------------------------------------------------
+# # ----------------------------------------------------------
+# # INSTALL TRIVY
+# # ----------------------------------------------------------
 
-      - name: Install Trivy
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
-          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
-          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
-          sudo apt-get update
-          sudo apt-get install -y trivy
+#       - name: Install Trivy
+#         run: |
+#           sudo apt-get update
+#           sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+#           wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+#           echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
+#           sudo apt-get update
+#           sudo apt-get install -y trivy
 
-# ----------------------------------------------------------
-# FILESYSTEM SCAN
-# ----------------------------------------------------------
+# # ----------------------------------------------------------
+# # FILESYSTEM SCAN
+# # ----------------------------------------------------------
 
-      - name: Trivy filesystem scan
-        run: |
-          trivy fs --format table -o fs-report.html .
+#       - name: Trivy filesystem scan
+#         run: |
+#           trivy fs --format table -o fs-report.html .
 
-# ----------------------------------------------------------
-# BUILD DOCKER IMAGE
-# ----------------------------------------------------------
+# # ----------------------------------------------------------
+# # BUILD DOCKER IMAGE
+# # ----------------------------------------------------------
 
-      - name: Build Docker image
-        run: docker build -t $DOCKER_IMAGE_NAME .
+#       - name: Build Docker image
+#         run: docker build -t $DOCKER_IMAGE_NAME .
 
-# ----------------------------------------------------------
-# IMAGE SCAN
-# ----------------------------------------------------------
+# # ----------------------------------------------------------
+# # IMAGE SCAN
+# # ----------------------------------------------------------
 
-      - name: Trivy image scan
-        run: |
-          trivy image --format table -o image-report.html $DOCKER_IMAGE_NAME
-          docker save -o image.tar "$DOCKER_IMAGE_NAME:latest"
-
-
-# ----------------------------------------------------------
-# SET ENV BASED ON BRANCH
-# ----------------------------------------------------------
-
-      - name: Set environment variables
-        run: |
-          if [[ "${GITHUB_REF##*/}" == "prod" ]]; then
-            echo "ECR_REPO_NAME=primeslice-prod-docker-repo" >> $GITHUB_ENV
-            echo "IMAGE_TAG=prod" >> $GITHUB_ENV
-          else
-            echo "ECR_REPO_NAME=primeslice-uat-docker-repo" >> $GITHUB_ENV
-            echo "IMAGE_TAG=uat" >> $GITHUB_ENV
-          fi
-
-# ----------------------------------------------------------
-# AWS LOGIN
-# ----------------------------------------------------------
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-# ----------------------------------------------------------
-# CREATE ECR REPO IF NOT EXISTS
-# ----------------------------------------------------------
-
-      - name: Ensure ECR repository exists
-        run: |
-          aws ecr describe-repositories --repository-names $ECR_REPO_NAME || \
-          aws ecr create-repository --repository-name $ECR_REPO_NAME
-
-# ----------------------------------------------------------
-# LOGIN ECR
-# ----------------------------------------------------------
-
-      - name: Login to ECR
-        run: |
-          aws ecr get-login-password --region $AWS_REGION | \
-          docker login --username AWS --password-stdin \
-          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com
+#       - name: Trivy image scan
+#         run: |
+#           trivy image --format table -o image-report.html $DOCKER_IMAGE_NAME
+#           docker save -o image.tar "$DOCKER_IMAGE_NAME:latest"
 
 
-# ----------------------------------------------------------
-# LOAD IMAGE + TAG
-# ----------------------------------------------------------
-      - name: Tag docker image
-        run: |
-          docker tag $DOCKER_IMAGE_NAME:latest \
-          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_NAME:$IMAGE_TAG
+# # ----------------------------------------------------------
+# # SET ENV BASED ON BRANCH
+# # ----------------------------------------------------------
 
-# ----------------------------------------------------------
-# PUSH IMAGE
-# ----------------------------------------------------------
+#       - name: Set environment variables
+#         run: |
+#           if [[ "${GITHUB_REF##*/}" == "prod" ]]; then
+#             echo "ECR_REPO_NAME=primeslice-prod-docker-repo" >> $GITHUB_ENV
+#             echo "IMAGE_TAG=prod" >> $GITHUB_ENV
+#           else
+#             echo "ECR_REPO_NAME=primeslice-uat-docker-repo" >> $GITHUB_ENV
+#             echo "IMAGE_TAG=uat" >> $GITHUB_ENV
+#           fi
 
-      - name: Push docker image
-        run: |
-          docker push \
-          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_NAME:$IMAGE_TAG
+# # ----------------------------------------------------------
+# # AWS LOGIN
+# # ----------------------------------------------------------
 
-# ----------------------------------------------------------
-# CLEANUP
-# ----------------------------------------------------------
+#       - name: Configure AWS credentials
+#         uses: aws-actions/configure-aws-credentials@v1
+#         with:
+#           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Docker cleanup
-        run: |
-          docker system prune -af || true
-          docker volume prune -f || true
+# # ----------------------------------------------------------
+# # CREATE ECR REPO IF NOT EXISTS
+# # ----------------------------------------------------------
 
-# ----------------------------------------------------------
-# FINAL EMAIL
-# ----------------------------------------------------------
+#       - name: Ensure ECR repository exists
+#         run: |
+#           aws ecr describe-repositories --repository-names $ECR_REPO_NAME || \
+#           aws ecr create-repository --repository-name $ECR_REPO_NAME
 
-      - name: Send deployment email
-        if: always()
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 587
-          username: ${{ secrets.SMTP_USER }}
-          password: ${{ secrets.SMTP_PASS }}
-          subject: "Deployment Completed"
-          body: |
-            Hello Team,
+# # ----------------------------------------------------------
+# # LOGIN ECR
+# # ----------------------------------------------------------
 
-            Deployment completed successfully.
+#       - name: Login to ECR
+#         run: |
+#           aws ecr get-login-password --region $AWS_REGION | \
+#           docker login --username AWS --password-stdin \
+#           ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com
 
-            Branch: ${{ github.ref }}
-            Status: ${{ job.status }}
 
-            GitHub Actions:
-            https://github.com/${{ github.repository }}/actions
-          to: kalpana.kunchapu999@gmail.com
-          from: sender@example.com
+# # ----------------------------------------------------------
+# # LOAD IMAGE + TAG
+# # ----------------------------------------------------------
+#       - name: Tag docker image
+#         run: |
+#           docker tag $DOCKER_IMAGE_NAME:latest \
+#           ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_NAME:$IMAGE_TAG
+
+# # ----------------------------------------------------------
+# # PUSH IMAGE
+# # ----------------------------------------------------------
+
+#       - name: Push docker image
+#         run: |
+#           docker push \
+#           ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_NAME:$IMAGE_TAG
+
+# # ----------------------------------------------------------
+# # CLEANUP
+# # ----------------------------------------------------------
+
+#       - name: Docker cleanup
+#         run: |
+#           docker system prune -af || true
+#           docker volume prune -f || true
+
+# # ----------------------------------------------------------
+# # FINAL EMAIL
+# # ----------------------------------------------------------
+
+#       - name: Send deployment email
+#         if: always()
+#         uses: dawidd6/action-send-mail@v3
+#         with:
+#           server_address: smtp.gmail.com
+#           server_port: 587
+#           username: ${{ secrets.SMTP_USER }}
+#           password: ${{ secrets.SMTP_PASS }}
+#           subject: "Deployment Completed"
+#           body: |
+#             Hello Team,
+
+#             Deployment completed successfully.
+
+#             Branch: ${{ github.ref }}
+#             Status: ${{ job.status }}
+
+#             GitHub Actions:
+#             https://github.com/${{ github.repository }}/actions
+#           to: kalpana.kunchapu999@gmail.com
+#           from: sender@example.com
+
+
+
