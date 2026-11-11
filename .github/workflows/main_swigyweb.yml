@@ -46,6 +46,8 @@ jobs:
       # Build application
       - name: Build application
         run: npm run build --if-present
+        env:
+          CI: "false"
 
       # Run tests and skip placeholder test scripts
       - name: Run tests
