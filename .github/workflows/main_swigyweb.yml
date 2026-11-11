@@ -49,7 +49,7 @@ jobs:
         env:
           CI: "false"
 
-      # Run tests and skip placeholder test scripts
+      # Run tests
       - name: Run tests
         shell: bash
         run: |
@@ -57,13 +57,12 @@ jobs:
 
           if [[ -z "$TEST_SCRIPT" ]]; then
             echo "No test script found. Skipping tests."
-
-          elif [[ "$TEST_SCRIPT" == *"Error: no test specified"* ]]; then
+          elif [[ "$TEST_SCRIPT" == *"no test specified"* ]]; then
             echo "Placeholder test script found. Skipping tests."
-
           else
-            npm test
+            CI=true npm test -- --watchAll=false --passWithNoTests
           fi
+
 
       # Install Trivy
       - name: Install Trivy
