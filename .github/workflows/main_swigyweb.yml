@@ -25,6 +25,7 @@ jobs:
 
     env:
       DOCKER_IMAGE_NAME: swigy
+      IMAGE_TAG: ${{ github.sha }}
 
     steps:
 
@@ -53,16 +54,19 @@ jobs:
       - name: Run tests
         shell: bash
         run: |
+          set -euo pipefail
+
           TEST_SCRIPT=$(jq -r '.scripts.test // empty' package.json)
 
           if [[ -z "$TEST_SCRIPT" ]]; then
             echo "No test script found. Skipping tests."
+
           elif [[ "$TEST_SCRIPT" == *"no test specified"* ]]; then
             echo "Placeholder test script found. Skipping tests."
+
           else
             CI=true npm test -- --watchAll=false --passWithNoTests
           fi
-
 
       # Install Trivy
       - name: Install Trivy
@@ -93,7 +97,7 @@ jobs:
       - name: Build Docker image
         run: |
           docker build \
-            -t $DOCKER_IMAGE_NAME:${{ github.sha }} \
+            -t "$DOCKER_IMAGE_NAME:$IMAGE_TAG" \
             .
 
       # Docker image vulnerability scan
@@ -103,14 +107,14 @@ jobs:
             --severity HIGH,CRITICAL \
             --format table \
             -o image-report.txt \
-            $DOCKER_IMAGE_NAME:${{ github.sha }}
+            "$DOCKER_IMAGE_NAME:$IMAGE_TAG"
 
       # Save Docker image
       - name: Save Docker image
         run: |
           docker save \
             -o image.tar \
-            $DOCKER_IMAGE_NAME:${{ github.sha }}
+            "$DOCKER_IMAGE_NAME:$IMAGE_TAG"
 
       # Upload filesystem scan report
       - name: Upload filesystem scan report
@@ -143,6 +147,8 @@ jobs:
 
     needs: build
 
+    # Deploy only on push to dev branch.
+    # Pull requests will not deploy.
     if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
 
     runs-on: ubuntu-latest
@@ -158,10 +164,31 @@ jobs:
       ACR_NAME: ${{ vars.ACR_NAME }}
       ACR_REPOSITORY: ${{ vars.ACR_REPOSITORY }}
       ACR_LOGIN_SERVER: ${{ vars.ACR_NAME }}.azurecr.io
-      DOCKER_IMAGE_NAME: onroute-backend
+      DOCKER_IMAGE_NAME: swigy
       IMAGE_TAG: ${{ github.sha }}
 
     steps:
+
+      # Validate ACR configuration
+      - name: Validate ACR configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "$ACR_NAME" ]]; then
+            echo "ACR_NAME variable is missing."
+            exit 1
+          fi
+
+          if [[ -z "$ACR_REPOSITORY" ]]; then
+            echo "ACR_REPOSITORY variable is missing."
+            exit 1
+          fi
+
+          echo "ACR Name: $ACR_NAME"
+          echo "ACR Repository: $ACR_REPOSITORY"
+          echo "ACR Login Server: $ACR_LOGIN_SERVER"
+          echo "Docker Image: $DOCKER_IMAGE_NAME:$IMAGE_TAG"
 
       # Download Docker image artifact
       - name: Download deployment artifacts
@@ -170,7 +197,7 @@ jobs:
           name: deployment-artifacts
           path: ./artifacts
 
-      # Authenticate with Azure using OIDC
+      # Azure OIDC authentication
       - name: Azure Login
         uses: azure/login@v2
         with:
@@ -193,6 +220,9 @@ jobs:
         run: |
           docker load -i artifacts/image.tar
 
+          docker image inspect \
+            "$DOCKER_IMAGE_NAME:$IMAGE_TAG"
+
       # Tag Docker image
       - name: Tag Docker image
         run: |
@@ -204,7 +234,7 @@ jobs:
             "$DOCKER_IMAGE_NAME:$IMAGE_TAG" \
             "$ACR_LOGIN_SERVER/$ACR_REPOSITORY:dev"
 
-      # Push image to Azure Container Registry
+      # Push Docker image to ACR
       - name: Push Docker image to ACR
         run: |
           docker push \
@@ -213,12 +243,13 @@ jobs:
           docker push \
             "$ACR_LOGIN_SERVER/$ACR_REPOSITORY:dev"
 
-      # Verify pushed Docker image
+      # Verify pushed image
       - name: Verify ACR image
         run: |
           az acr repository show \
             --name "$ACR_NAME" \
-            --image "$ACR_REPOSITORY:$IMAGE_TAG"
+            --image "$ACR_REPOSITORY:$IMAGE_TAG" \
+            --output table
 
       # List available image tags
       - name: Verify ACR repository tags
