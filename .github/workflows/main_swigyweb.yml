@@ -24,8 +24,8 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      DOCKER_IMAGE_NAME: swigy
-      IMAGE_TAG: ${{ github.sha }}
+      DOCKER_IMAGE_NAME: ${{ vars.DOCKER_IMAGE_NAME }}
+      IMAGE_TAG: ${{ vars.IMAGE_TAG }}
 
     steps:
 
@@ -164,8 +164,8 @@ jobs:
       ACR_NAME: ${{ vars.ACR_NAME }}
       ACR_REPOSITORY: ${{ vars.ACR_REPOSITORY }}
       ACR_LOGIN_SERVER: ${{ vars.ACR_NAME }}.azurecr.io
-      DOCKER_IMAGE_NAME: swigy
-      IMAGE_TAG: ${{ github.sha }}
+      DOCKER_IMAGE_NAME: ${{ vars.DOCKER_IMAGE_NAME }}
+      IMAGE_TAG: ${{ vars.IMAGE_TAG }}
 
     steps:
 
@@ -230,9 +230,6 @@ jobs:
             "$DOCKER_IMAGE_NAME:$IMAGE_TAG" \
             "$ACR_LOGIN_SERVER/$ACR_REPOSITORY:$IMAGE_TAG"
 
-          docker tag \
-            "$DOCKER_IMAGE_NAME:$IMAGE_TAG" \
-            "$ACR_LOGIN_SERVER/$ACR_REPOSITORY:dev"
 
       # Push Docker image to ACR
       - name: Push Docker image to ACR
@@ -240,8 +237,6 @@ jobs:
           docker push \
             "$ACR_LOGIN_SERVER/$ACR_REPOSITORY:$IMAGE_TAG"
 
-          docker push \
-            "$ACR_LOGIN_SERVER/$ACR_REPOSITORY:dev"
 
       # Verify pushed image
       - name: Verify ACR image
