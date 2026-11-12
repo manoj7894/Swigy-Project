@@ -23,6 +23,10 @@ jobs:
     name: Build and Scan Docker Image
     runs-on: ubuntu-latest
 
+    # Required to access environment-level variables
+    environment:
+      name: dev
+
     env:
       DOCKER_IMAGE_NAME: ${{ vars.DOCKER_IMAGE_NAME }}
       IMAGE_TAG: ${{ vars.IMAGE_TAG }}
