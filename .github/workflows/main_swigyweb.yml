@@ -261,7 +261,7 @@ jobs:
       - name: Deploy latest image to Azure Container App
         run: |
           az containerapp update \
-            --name frissly-Appservice \
+            --name frissly-dev-appservice \
             --resource-group frissly-infra-rg \
             --image $ACR_LOGIN_SERVER/$ACR_REPOSITORY:$IMAGE_TAG
 
