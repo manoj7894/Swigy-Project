@@ -258,6 +258,13 @@ jobs:
             --repository "$ACR_REPOSITORY" \
             --output table
 
+      - name: Deploy latest image to Azure Container App
+        run: |
+          az containerapp update \
+            --name frissly-Appservice \
+            --resource-group frissly-infra-rg \
+            --image $ACR_LOGIN_SERVER/$ACR_REPOSITORY:$IMAGE_TAG
+
       # Cleanup Docker images
       - name: Docker cleanup
         if: always()
@@ -269,3 +276,27 @@ jobs:
         if: always()
         run: |
           az logout || true
+
+
+      - name: Send email notification
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.SMTP_USER }}
+          password: ${{ secrets.SMTP_PASS }}
+          subject: "Approval Required: Deploy to production"
+          body: |
+            Hello Team,
+
+            The Dev deployment for branch 'main' is complete.
+
+            Please approve the production deployment:
+            GitHub Actions: https://github.com/${{ github.repository }}/actions
+
+            Status: ${{ job.status }}
+            Commit: ${{ github.sha }}
+            Branch: ${{ github.ref }}
+          to: "manojvarmapotthutri@gmail.com"
+          from: "sender@example.com"
