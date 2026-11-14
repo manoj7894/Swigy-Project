@@ -258,12 +258,12 @@ jobs:
             --repository "$ACR_REPOSITORY" \
             --output table
 
-      - name: Deploy latest image to Azure Container App
-        run: |
-          az containerapp update \
-            --name frissly-dev-appservice \
-            --resource-group frissly-infra-rg \
-            --image $ACR_LOGIN_SERVER/$ACR_REPOSITORY:$IMAGE_TAG
+      # - name: Deploy latest image to Azure Container App
+      #   run: |
+      #     az containerapp update \
+      #       --name frissly-dev-appservice \
+      #       --resource-group frissly-infra-rg \
+      #       --image $ACR_LOGIN_SERVER/$ACR_REPOSITORY:$IMAGE_TAG
 
       # Cleanup Docker images
       - name: Docker cleanup
