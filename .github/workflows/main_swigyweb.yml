@@ -227,19 +227,35 @@ jobs:
           docker image inspect \
             "$DOCKER_IMAGE_NAME:$IMAGE_TAG"
 
-      # Tag Docker image
+      # # Tag Docker image
+      # - name: Tag Docker image
+      #   run: |
+      #     docker tag \
+      #       "$DOCKER_IMAGE_NAME:$IMAGE_TAG" \
+      #       "$ACR_LOGIN_SERVER/$ACR_REPOSITORY:$IMAGE_TAG"
+            
+
+
+      # # Push Docker image to ACR
+      # - name: Push Docker image to ACR
+      #   run: |
+      #     docker push \
+      #       "$ACR_LOGIN_SERVER/$ACR_REPOSITORY:$IMAGE_TAG"
+
+
       - name: Tag Docker image
         run: |
-          docker tag \
-            "$DOCKER_IMAGE_NAME:$IMAGE_TAG" \
-            "$ACR_LOGIN_SERVER/$ACR_REPOSITORY:$IMAGE_TAG"
+          docker tag $DOCKER_IMAGE_NAME:$IMAGE_TAG \
+            $ACR_LOGIN_SERVER/$ACR_REPOSITORY:dev
 
+          docker tag $DOCKER_IMAGE_NAME:$IMAGE_TAG \
+            $ACR_LOGIN_SERVER/$ACR_REPOSITORY:build-${{ github.run_number }}
 
-      # Push Docker image to ACR
-      - name: Push Docker image to ACR
+      - name: Push Docker images
         run: |
-          docker push \
-            "$ACR_LOGIN_SERVER/$ACR_REPOSITORY:$IMAGE_TAG"
+          docker push $ACR_LOGIN_SERVER/$ACR_REPOSITORY:dev
+
+          docker push $ACR_LOGIN_SERVER/$ACR_REPOSITORY:build-${{ github.run_number }}
 
 
       # Verify pushed image
